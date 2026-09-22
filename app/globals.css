@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --color-page: #f3f7f5;
+  --color-surface: #ffffff;
+  --color-ink: #031a3b;
+  --color-ink-soft: #243953;
+  --color-brand: #06b866;
+  --color-brand-hover: #009f58;
+  --color-brand-soft: #e8f8ef;
+  --color-border: rgba(30, 57, 84, 0.14);
+  --color-muted: #536579;
+  --color-sidebar: #031a3b;
+  --color-danger: #b74c39;
+  --shadow-card: 0 24px 70px rgba(18, 45, 72, 0.1);
+
+  --text-display: clamp(2.5rem, 5vw, 4.8rem);
+  --text-h1: clamp(2rem, 3.5vw, 3.2rem);
+  --text-h2: clamp(1.45rem, 2.4vw, 2rem);
+  --text-h3: clamp(1.05rem, 1.5vw, 1.3rem);
+  --text-body: clamp(0.9rem, 1vw, 1rem);
+  --text-small: clamp(0.72rem, 0.8vw, 0.84rem);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-page);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: white;
+}
+
+.admin-grid {
+  background-image:
+    linear-gradient(rgba(3, 26, 59, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(3, 26, 59, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

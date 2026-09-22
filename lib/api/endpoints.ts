@@ -1,0 +1,23 @@
+export const API_ENDPOINTS = {
+  backend: {
+    clients: "/clients",
+    dashboard: "/dashboard",
+    login: "/internal/login",
+    logout: "/internal/logout",
+    me: "/internal/me",
+    deposits: "/deposits",
+    paymentMethods: "/payment-methods",
+    refresh: "/internal/token/refresh",
+    transactions: "/transactions",
+  },
+  frontend: {
+    clients: "/api/admin/clients",
+    dashboard: "/api/admin/dashboard",
+    login: "/api/admin/login",
+    logout: "/api/admin/logout",
+    deposits: "/api/admin/deposits",
+    paymentMethods: "/api/admin/payment-methods",
+    refresh: "/api/admin/token/refresh",
+    transactions: "/api/admin/transactions",
+  },
+} as const;
