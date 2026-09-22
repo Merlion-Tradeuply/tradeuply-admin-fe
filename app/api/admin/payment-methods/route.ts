@@ -2,8 +2,14 @@ import { authenticatedAdminRequest, jsonProxyResponse } from "@/lib/api/authenti
 import { API_ENDPOINTS } from "@/lib/api/endpoints";
 
 export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const queryString = requestUrl.searchParams.toString();
   return jsonProxyResponse(
-    await authenticatedAdminRequest(request, API_ENDPOINTS.backend.paymentMethods, { method: "GET" }),
+    await authenticatedAdminRequest(
+      request,
+      `${API_ENDPOINTS.backend.paymentMethods}${queryString ? `?${queryString}` : ""}`,
+      { method: "GET" },
+    ),
   );
 }
 

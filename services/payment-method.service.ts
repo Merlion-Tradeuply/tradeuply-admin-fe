@@ -21,6 +21,20 @@ type ApiResponse<T> = {
   message?: string;
 };
 
+export type PaymentMethodFilters = {
+  category?: "bank" | "card" | "crypto" | "wallet";
+  query?: string;
+  sort?: "display-order" | "name-asc" | "name-desc";
+  status?: "active" | "coming_soon" | "disabled";
+};
+
+export type PaymentMethodSummary = {
+  active: number;
+  all: number;
+  coming_soon: number;
+  disabled: number;
+};
+
 async function readResponse<T>(response: Response) {
   const result = (await response.json()) as ApiResponse<T>;
 
@@ -33,12 +47,23 @@ async function readResponse<T>(response: Response) {
   return result;
 }
 
-export async function getPaymentMethods() {
-  const response = await fetch(API_ENDPOINTS.frontend.paymentMethods);
-  const result = await readResponse<{ methods: AdminPaymentMethod[] }>(
-    response,
+export async function getPaymentMethods(filters: PaymentMethodFilters = {}) {
+  const parameters = new URLSearchParams();
+
+  if (filters.category) parameters.set("category", filters.category);
+  if (filters.query?.trim()) parameters.set("q", filters.query.trim());
+  if (filters.sort) parameters.set("sort", filters.sort);
+  if (filters.status) parameters.set("status", filters.status);
+
+  const queryString = parameters.toString();
+  const response = await fetch(
+    `${API_ENDPOINTS.frontend.paymentMethods}${queryString ? `?${queryString}` : ""}`,
   );
-  return result.data!.methods;
+  const result = await readResponse<{
+    methods: AdminPaymentMethod[];
+    summary: PaymentMethodSummary;
+  }>(response);
+  return result.data!;
 }
 
 export async function savePaymentMethod(

@@ -130,7 +130,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
     if (!methodId) return;
 
     getPaymentMethods()
-      .then((methods) => {
+      .then(({ methods }) => {
         const method = methods.find((item) => item.id === methodId);
         if (!method)
           throw new Error("The requested payment method could not be found.");

@@ -13,23 +13,29 @@ import {
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   DataTable,
   type DataTableColumn,
 } from "@/components/ui/data-table";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "@/components/ui/custom-select";
 import type { AdminPaymentMethod } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import {
   deletePaymentMethods,
   getPaymentMethods,
+  type PaymentMethodSummary,
 } from "@/services/payment-method.service";
 import { useAppSelector } from "@/store/hooks";
 
 const statusOptions = ["all", "active", "coming_soon", "disabled"] as const;
 type StatusFilter = (typeof statusOptions)[number];
 type SortOption = "display-order" | "name-asc" | "name-desc";
+type CategoryFilter = "all" | AdminPaymentMethod["category"];
 
 const statusLabels: Record<StatusFilter, string> = {
   active: "Active",
@@ -45,6 +51,27 @@ const categoryIcons = {
   wallet: Wallet,
 };
 
+const categoryOptions: CustomSelectOption<CategoryFilter>[] = [
+  { label: "All categories", value: "all" },
+  { label: "Bank", value: "bank" },
+  { label: "Card", value: "card" },
+  { label: "Cryptocurrency", value: "crypto" },
+  { label: "Digital wallet", value: "wallet" },
+];
+
+const sortOptions: CustomSelectOption<SortOption>[] = [
+  { label: "Display order", value: "display-order" },
+  { label: "Name A–Z", value: "name-asc" },
+  { label: "Name Z–A", value: "name-desc" },
+];
+
+const emptySummary: PaymentMethodSummary = {
+  active: 0,
+  all: 0,
+  coming_soon: 0,
+  disabled: 0,
+};
+
 function getStatusClasses(status: AdminPaymentMethod["status"]) {
   if (status === "active") return "bg-[#e5f8ee] text-[#008c4e]";
   if (status === "disabled") return "bg-[#f1f3f5] text-[#6e7b8a]";
@@ -54,58 +81,59 @@ function getStatusClasses(status: AdminPaymentMethod["status"]) {
 export function PaymentMethodManager() {
   const user = useAppSelector((state) => state.auth.user);
   const [methods, setMethods] = useState<AdminPaymentMethod[]>([]);
-  const [category, setCategory] = useState("all");
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sort, setSort] = useState<SortOption>("display-order");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [statusCounts, setStatusCounts] =
+    useState<PaymentMethodSummary>(emptySummary);
   const canEdit = user?.roles.includes("super-admin") ?? false;
 
   useEffect(() => {
-    getPaymentMethods()
-      .then(setMethods)
-      .catch((requestError: Error) => setError(requestError.message))
-      .finally(() => setIsLoading(false));
-  }, []);
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 350);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
 
-  const filteredMethods = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const result = methods.filter((method) => {
-      const matchesSearch =
-        !normalizedQuery ||
-        [method.name, method.code, method.asset, method.network]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(normalizedQuery));
-      const matchesStatus = status === "all" || method.status === status;
-      const matchesCategory =
-        category === "all" || method.category === category;
+  useEffect(() => {
+    let ignoreResult = false;
+    const requestTimeout = window.setTimeout(() => {
+      setIsLoading(true);
+      setError("");
+      setSelectedIds([]);
 
-      return matchesSearch && matchesStatus && matchesCategory;
-    });
+      getPaymentMethods({
+        category: category === "all" ? undefined : category,
+        query: debouncedQuery,
+        sort,
+        status: status === "all" ? undefined : status,
+      })
+        .then((result) => {
+          if (ignoreResult) return;
+          setMethods(result.methods);
+          setStatusCounts(result.summary);
+        })
+        .catch((requestError: Error) => {
+          if (!ignoreResult) setError(requestError.message);
+        })
+        .finally(() => {
+          if (!ignoreResult) setIsLoading(false);
+        });
+    }, 0);
 
-    return result.sort((first, second) => {
-      if (sort === "name-asc") return first.name.localeCompare(second.name);
-      if (sort === "name-desc") return second.name.localeCompare(first.name);
-      return first.displayOrder - second.displayOrder;
-    });
-  }, [category, methods, query, sort, status]);
+    return () => {
+      ignoreResult = true;
+      window.clearTimeout(requestTimeout);
+    };
+  }, [category, debouncedQuery, reloadKey, sort, status]);
 
-  const statusCounts = useMemo(
-    () => ({
-      active: methods.filter((method) => method.status === "active").length,
-      all: methods.length,
-      coming_soon: methods.filter((method) => method.status === "coming_soon")
-        .length,
-      disabled: methods.filter((method) => method.status === "disabled").length,
-    }),
-    [methods],
-  );
-
-  const visibleIds = filteredMethods.map((method) => method.id);
+  const visibleIds = methods.map((method) => method.id);
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
 
@@ -131,13 +159,9 @@ export function PaymentMethodManager() {
 
     try {
       await deletePaymentMethods(pendingDeleteIds);
-      setMethods((current) =>
-        current.filter((method) => !pendingDeleteIds.includes(method.id)),
-      );
-      setSelectedIds((current) =>
-        current.filter((id) => !pendingDeleteIds.includes(id)),
-      );
+      setSelectedIds([]);
       setPendingDeleteIds([]);
+      setReloadKey((current) => current + 1);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -312,28 +336,18 @@ export function PaymentMethodManager() {
                 value={query}
               />
             </label>
-            <select
-              aria-label="Filter by category"
-              className="h-12 rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-4 text-xs font-extrabold outline-none focus:border-[var(--color-brand)]"
-              onChange={(event) => setCategory(event.target.value)}
+            <CustomSelect
+              ariaLabel="Filter by category"
+              onChange={setCategory}
+              options={categoryOptions}
               value={category}
-            >
-              <option value="all">All categories</option>
-              <option value="bank">Bank</option>
-              <option value="card">Card</option>
-              <option value="crypto">Cryptocurrency</option>
-              <option value="wallet">Digital wallet</option>
-            </select>
-            <select
-              aria-label="Sort payment methods"
-              className="h-12 rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-4 text-xs font-extrabold outline-none focus:border-[var(--color-brand)]"
-              onChange={(event) => setSort(event.target.value as SortOption)}
+            />
+            <CustomSelect
+              ariaLabel="Sort payment methods"
+              onChange={setSort}
+              options={sortOptions}
               value={sort}
-            >
-              <option value="display-order">Display order</option>
-              <option value="name-asc">Name A–Z</option>
-              <option value="name-desc">Name Z–A</option>
-            </select>
+            />
             <button
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#efc8c0] px-4 text-xs font-extrabold text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!canEdit || selectedIds.length === 0}
@@ -355,7 +369,7 @@ export function PaymentMethodManager() {
           emptyTitle="No payment methods found"
           getRowId={(method) => method.id}
           isLoading={isLoading}
-          rows={filteredMethods}
+          rows={methods}
           selection={{
             getLabel: (methodId, isSelected) => {
               const method = methods.find((item) => item.id === methodId);
@@ -367,10 +381,10 @@ export function PaymentMethodManager() {
           }}
         />
 
-        {!isLoading && filteredMethods.length > 0 && (
+        {!isLoading && methods.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
             <span>
-              Showing {filteredMethods.length} of {methods.length} methods
+              Showing {methods.length} of {statusCounts.all} methods
             </span>
             <span>{selectedIds.length} selected</span>
           </div>
