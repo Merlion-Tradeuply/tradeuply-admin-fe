@@ -25,8 +25,9 @@ import {
   type PaymentMethodPayload,
 } from "@/services/payment-method.service";
 import { uploadPaymentMethodQrCode } from "@/services/upload.service";
+import type { QrUploadStage } from "@/services/upload.service";
 
-const maximumQrImageBytes = 5 * 1024 * 1024;
+const maximumQrImageBytes = 4 * 1024 * 1024;
 
 const categories = [
   {
@@ -120,6 +121,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
   const [message, setMessage] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<QrUploadStage>("preparing");
   const [isUploading, setIsUploading] = useState(false);
   const isEditing = Boolean(currentMethodId);
   const labels = getProcessingLabels(form.category);
@@ -166,8 +168,8 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
       },
       { complete: Boolean(form.instructions), label: "Client instructions" },
       {
-        complete: form.code !== "usdt" || Boolean(qrCodeUrl),
-        label: "QR asset, when required",
+        complete: form.category !== "crypto" || Boolean(qrCodeUrl),
+        label: "Cryptocurrency wallet QR asset",
       },
     ],
     [form, qrCodeUrl],
@@ -264,12 +266,13 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
       return;
     }
     if (file.size > maximumQrImageBytes) {
-      setError("The QR code image must be 5 MB or smaller.");
+      setError("The QR code image must be 4 MB or smaller.");
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadStage("preparing");
     setError("");
     setMessage("");
 
@@ -277,7 +280,10 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
       const method = await uploadPaymentMethodQrCode({
         file,
         methodId: currentMethodId,
-        onProgress: setUploadProgress,
+        onProgress: ({ percentage, stage }) => {
+          setUploadProgress(percentage);
+          setUploadStage(stage);
+        },
       });
       setQrCodeUrl(method.qrCodeUrl);
       setMessage("The receiving-wallet QR code was uploaded successfully.");
@@ -558,7 +564,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
           </label>
         </section>
 
-        {form.code === "usdt" && (
+        {form.category === "crypto" && (
           <section className="rounded-[1.7rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_18px_55px_rgba(18,45,72,0.055)] sm:p-7">
             <div className="flex items-start gap-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-sm font-extrabold text-[var(--color-brand-hover)]">
@@ -566,7 +572,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
               </span>
               <div>
                 <h2 className="text-lg font-extrabold text-[var(--color-ink)]">
-                  USDT wallet QR asset
+                  Cryptocurrency wallet QR asset
                 </h2>
                 <p className="mt-1 text-xs leading-5 font-medium text-[var(--color-muted)]">
                   Create the method first, then upload the QR image shown in the
@@ -578,7 +584,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
               <div className="grid size-36 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white">
                 {qrCodeUrl ? (
                   <Image
-                    alt="USDT wallet QR code"
+                    alt={`${form.name || form.asset || "Cryptocurrency"} wallet QR code`}
                     className="size-full object-contain p-2"
                     height={260}
                     src={qrCodeUrl}
@@ -594,7 +600,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
               </div>
               <div className="flex-1">
                 <p className="text-xs font-extrabold text-[var(--color-ink)]">
-                  PNG, JPEG, or WebP · maximum 5 MB
+                  PNG, JPEG, or WebP · maximum 4 MB
                 </p>
                 <p className="mt-2 text-[0.68rem] leading-5 font-semibold text-[var(--color-muted)]">
                   Use a clear, square QR code generated for the receiving wallet
@@ -625,9 +631,11 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
               <div className="mt-4" aria-live="polite">
                 <div className="flex justify-between text-[0.68rem] font-bold text-[var(--color-muted)]">
                   <span>
-                    {uploadProgress < 100
-                      ? `Uploading ${uploadProgress}%`
-                      : "Processing on Cloudinary…"}
+                    {uploadStage === "preparing"
+                      ? "Preparing secure upload…"
+                      : uploadStage === "saving"
+                        ? "Verifying and saving…"
+                        : `Uploading to Cloudinary ${uploadProgress}%`}
                   </span>
                   <span>{uploadProgress}%</span>
                 </div>
