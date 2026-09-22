@@ -116,6 +116,24 @@ export type AdminPaymentMethod = {
   walletAddress: string | null;
 };
 
+export type AdminInvestmentPlan = {
+  allocation: string;
+  badge: string | null;
+  dailyObjective: number;
+  description: string;
+  displayOrder: number;
+  features: string[];
+  horizonDays: number;
+  icon: "chart" | "coins" | "globe" | "leaf" | "shield" | "sparkle";
+  id: string;
+  isFeatured: boolean;
+  minimumInvestment: number;
+  name: string;
+  risk: string;
+  slug: string;
+  status: "active" | "coming_soon" | "disabled";
+};
+
 export type AdminDepositActivity = {
   actorLabel: string;
   actorType: "client" | "internal" | "system";

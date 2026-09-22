@@ -1,6 +1,7 @@
 import {
   Coins,
   CreditCard,
+  Briefcase,
   Receipt,
   SquaresFour,
   UsersThree,
@@ -31,5 +32,10 @@ export const adminNavigation = [
     href: "/payment-methods",
     icon: CreditCard,
     label: "Payment Methods",
+  },
+  {
+    href: "/investment-plans",
+    icon: Briefcase,
+    label: "Investment Plans",
   },
 ] as const;

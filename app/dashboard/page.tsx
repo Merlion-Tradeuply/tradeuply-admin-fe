@@ -8,6 +8,7 @@ import {
   TrendUp,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 
 import { DashboardSummary } from "@/components/dashboard/dashboard-summary";
 
@@ -19,21 +20,25 @@ export const metadata = {
 const upcomingModules = [
   {
     description: "Review profiles, verification status, and account access.",
+    href: "/clients",
     icon: UsersThree,
     title: "Client Management",
   },
   {
-    description: "Create and manage the six TradeUply investment plans.",
+    description: "Create and manage TradeUply investment plans.",
+    href: "/investment-plans",
     icon: Briefcase,
     title: "Investment Plans",
   },
   {
     description: "Monitor deposits, withdrawals, and investment activity.",
+    href: "/transactions",
     icon: TrendUp,
     title: "Transactions",
   },
   {
     description: "Configure platform preferences and administrative roles.",
+    href: "/dashboard",
     icon: GearSix,
     title: "Settings & Roles",
   },
@@ -86,9 +91,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            {upcomingModules.map(({ description, icon: Icon, title }) => (
-              <article
+            {upcomingModules.map(({ description, href, icon: Icon, title }) => (
+              <Link
                 className="group rounded-2xl border border-[var(--color-border)] bg-[#f8faf9] p-5 transition hover:border-[var(--color-brand)]/35 hover:bg-white"
+                href={href}
                 key={title}
               >
                 <div className="flex items-center justify-between gap-4">
@@ -108,7 +114,7 @@ export default function DashboardPage() {
                 <p className="mt-2 text-xs leading-6 font-medium text-[var(--color-muted)]">
                   {description}
                 </p>
-              </article>
+              </Link>
             ))}
           </div>
         </article>
