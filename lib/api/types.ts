@@ -74,6 +74,8 @@ export type AdminBalanceTransaction = {
   description: string;
   direction: "credit" | "debit";
   id: string;
+  sourceAmount?: string | null;
+  sourceCurrency?: string | null;
   type:
     | "deposit"
     | "withdrawal"
@@ -162,18 +164,42 @@ export type AdminDeposit = {
     lastName: string;
   };
   clientNotes: string;
+  convertedAmount: string | null;
+  convertedAsset: string | null;
   createdAt: string;
   destinationWalletAddress: string;
   id: string;
   methodCode: string;
   methodName: string;
   network: string;
+  paymentCategory: "crypto" | "wallet";
+  exchangeRate: string | null;
+  quoteExpiresAt: string | null;
+  rateQuotedAt: string | null;
+  rateSource: string | null;
   reviewNotes: string;
   reviewedAt: string | null;
   senderWalletAddress: string;
   status: "approved" | "pending" | "rejected";
   transactionHash: string;
   updatedAt: string;
+};
+
+export type AdminDepositConversion = {
+  amount: number;
+  convertedAmount: number;
+  from: { code: string; name: string; type: string };
+  lastUpdated: string;
+  paymentMethod: {
+    asset: string;
+    id: string;
+    name: string;
+    network: string;
+  };
+  quoteExpiresAt: string;
+  rate: number;
+  source: string;
+  to: { code: string; name: string; type: string };
 };
 
 export type AdminWithdrawal = {

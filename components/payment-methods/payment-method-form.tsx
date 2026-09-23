@@ -162,14 +162,14 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
       { complete: Boolean(form.category), label: "Payment category" },
       {
         complete:
-          form.category !== "crypto" ||
+          !["crypto", "wallet"].includes(form.category) ||
           Boolean(form.asset && form.network && form.walletAddress),
         label: "Processing configuration",
       },
       { complete: Boolean(form.instructions), label: "Client instructions" },
       {
-        complete: form.category !== "crypto" || Boolean(qrCodeUrl),
-        label: "Cryptocurrency wallet QR asset",
+        complete: !["crypto", "wallet"].includes(form.category) || Boolean(qrCodeUrl),
+        label: form.category === "wallet" ? "UPI QR asset" : "Cryptocurrency wallet QR asset",
       },
     ],
     [form, qrCodeUrl],
@@ -189,6 +189,17 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
       ...current,
       code: isCodeEdited ? current.code : createSlug(name),
       name,
+    }));
+    setError("");
+    setMessage("");
+  }
+
+  function selectCategory(category: AdminPaymentMethod["category"]) {
+    setForm((current) => ({
+      ...current,
+      asset: category === "wallet" && !current.asset ? "INR" : current.asset,
+      category,
+      network: category === "wallet" && !current.network ? "UPI" : current.network,
     }));
     setError("");
     setMessage("");
@@ -402,7 +413,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                       : "border-[var(--color-border)] bg-[#fafcfb] hover:border-[var(--color-brand)]/45",
                   )}
                   key={value}
-                  onClick={() => updateField("category", value)}
+                  onClick={() => selectCategory(value)}
                   type="button"
                 >
                   <span
@@ -479,7 +490,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                 onChange={(event) =>
                   updateField("asset", event.target.value.toUpperCase())
                 }
-                placeholder={form.category === "crypto" ? "BTC" : "USD"}
+                placeholder={form.category === "crypto" ? "BTC" : form.category === "wallet" ? "INR" : "USD"}
                 value={form.asset}
               />
             </label>
@@ -489,7 +500,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                 className="mt-2 h-13 w-full rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-4 text-sm font-bold outline-none focus:border-[var(--color-brand)]"
                 maxLength={40}
                 onChange={(event) => updateField("network", event.target.value)}
-                placeholder={form.category === "crypto" ? "TRC20" : "Optional"}
+                placeholder={form.category === "crypto" ? "TRC20" : form.category === "wallet" ? "UPI" : "Optional"}
                 value={form.network}
               />
             </label>
@@ -501,7 +512,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                 onChange={(event) =>
                   updateField("walletAddress", event.target.value)
                 }
-                placeholder="Optional destination or provider reference"
+                placeholder={form.category === "wallet" ? "tradeuply@upi" : "Optional destination or provider reference"}
                 value={form.walletAddress}
               />
             </label>
@@ -514,7 +525,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                   updateField("minimumAmount", event.target.value)
                 }
                 placeholder="No minimum"
-                step="0.00000001"
+                step={form.category === "wallet" ? "0.01" : "0.00000001"}
                 type="number"
                 value={form.minimumAmount}
               />
@@ -528,7 +539,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                   updateField("maximumAmount", event.target.value)
                 }
                 placeholder="No maximum"
-                step="0.00000001"
+                step={form.category === "wallet" ? "0.01" : "0.00000001"}
                 type="number"
                 value={form.maximumAmount}
               />
@@ -564,7 +575,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
           </label>
         </section>
 
-        {form.category === "crypto" && (
+        {["crypto", "wallet"].includes(form.category) && (
           <section className="rounded-[1.7rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_18px_55px_rgba(18,45,72,0.055)] sm:p-7">
             <div className="flex items-start gap-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-sm font-extrabold text-[var(--color-brand-hover)]">
@@ -572,7 +583,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
               </span>
               <div>
                 <h2 className="text-lg font-extrabold text-[var(--color-ink)]">
-                  Cryptocurrency wallet QR asset
+                  {form.category === "wallet" ? "UPI QR asset" : "Cryptocurrency wallet QR asset"}
                 </h2>
                 <p className="mt-1 text-xs leading-5 font-medium text-[var(--color-muted)]">
                   Create the method first, then upload the QR image shown in the
@@ -603,8 +614,8 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                   PNG, JPEG, or WebP · maximum 4 MB
                 </p>
                 <p className="mt-2 text-[0.68rem] leading-5 font-semibold text-[var(--color-muted)]">
-                  Use a clear, square QR code generated for the receiving wallet
-                  and selected network.
+                  Use a clear, square QR code generated for the configured
+                  {form.category === "wallet" ? " UPI ID." : " receiving wallet and selected network."}
                 </p>
                 <label className="mt-4 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-[var(--color-brand-soft)] px-4 text-xs font-extrabold text-[var(--color-brand-hover)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45">
                   <UploadSimple size={17} weight="bold" />

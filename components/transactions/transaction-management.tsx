@@ -247,17 +247,25 @@ export function TransactionManagement() {
       key: "amount",
       label: "Amount",
       render: (transaction) => (
-        <p
-          className={cn(
-            "text-sm font-extrabold",
-            transaction.direction === "credit"
-              ? "text-[#008c4e]"
-              : "text-[var(--color-danger)]",
+        <div>
+          <p
+            className={cn(
+              "text-sm font-extrabold",
+              transaction.direction === "credit"
+                ? "text-[#008c4e]"
+                : "text-[var(--color-danger)]",
+            )}
+          >
+            {transaction.direction === "credit" ? "+" : "−"}
+            {formatAmount(transaction.amount)} {transaction.currency}
+          </p>
+          {transaction.sourceAmount && transaction.sourceCurrency && (
+            <p className="mt-1 text-[0.64rem] font-bold text-[var(--color-muted)]">
+              From {transaction.sourceCurrency === "INR" ? "₹" : ""}
+              {formatAmount(transaction.sourceAmount)} {transaction.sourceCurrency}
+            </p>
           )}
-        >
-          {transaction.direction === "credit" ? "+" : "−"}
-          {formatAmount(transaction.amount)} {transaction.currency}
-        </p>
+        </div>
       ),
     },
     {

@@ -16,9 +16,18 @@ import {
   DataTable,
   type DataTableColumn,
 } from "@/components/ui/data-table";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "@/components/ui/custom-select";
 import { API_ENDPOINTS } from "@/lib/api/endpoints";
-import type { AdminDeposit } from "@/lib/api/types";
+import type {
+  AdminDeposit,
+  AdminDepositConversion,
+  AdminPaymentMethod,
+} from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { getPaymentMethods } from "@/services/payment-method.service";
 
 const statuses = ["all", "pending", "approved", "rejected"] as const;
 const statusStyle = {
@@ -69,6 +78,10 @@ export function DepositReviewManager() {
   const [selected, setSelected] = useState<AdminDeposit | null>(null);
   const [status, setStatus] = useState<DepositStatusFilter>("pending");
   const [summary, setSummary] = useState<DepositSummary>(emptySummary);
+  const [cryptoMethods, setCryptoMethods] = useState<AdminPaymentMethod[]>([]);
+  const [creditPaymentMethodId, setCreditPaymentMethodId] = useState("");
+  const [conversion, setConversion] = useState<AdminDepositConversion | null>(null);
+  const [isLoadingConversion, setIsLoadingConversion] = useState(false);
 
   const loadDeposits = useCallback(async () => {
     setIsLoading(true);
@@ -126,6 +139,40 @@ export function DepositReviewManager() {
     return () => window.clearTimeout(timeout);
   }, [loadDeposits]);
 
+  useEffect(() => {
+    getPaymentMethods({ category: "crypto", limit: 100, status: "active" })
+      .then(({ methods }) => setCryptoMethods(methods.filter((method) =>
+        Boolean(method.asset && method.network && method.walletAddress && method.qrCodeUrl),
+      )))
+      .catch(() => setCryptoMethods([]));
+  }, []);
+
+  useEffect(() => {
+    if (!selected || selected.paymentCategory !== "wallet" || !creditPaymentMethodId) {
+      setConversion(null);
+      return;
+    }
+    let ignore = false;
+    setIsLoadingConversion(true);
+    setError("");
+    fetch(`/api/admin/deposits/${selected.id}/conversion-quote?paymentMethodId=${encodeURIComponent(creditPaymentMethodId)}`)
+      .then(async (response) => {
+        const result = (await response.json()) as {
+          data?: { conversion: AdminDepositConversion };
+          error?: { message: string };
+        };
+        if (!response.ok || !result.data) throw new Error(result.error?.message ?? "Unable to load the conversion quote.");
+        if (!ignore) setConversion(result.data.conversion);
+      })
+      .catch((requestError) => {
+        if (!ignore) setError(requestError instanceof Error ? requestError.message : "Unable to load the conversion quote.");
+      })
+      .finally(() => {
+        if (!ignore) setIsLoadingConversion(false);
+      });
+    return () => { ignore = true; };
+  }, [creditPaymentMethodId, selected]);
+
   async function openDeposit(deposit: AdminDeposit) {
     setError("");
     const response = await fetch(
@@ -140,6 +187,8 @@ export function DepositReviewManager() {
       return;
     }
     setNotes("");
+    setCreditPaymentMethodId("");
+    setConversion(null);
     setSelected(result.data.deposit);
   }
 
@@ -149,6 +198,10 @@ export function DepositReviewManager() {
       setError("Add a reason before rejecting this deposit.");
       return;
     }
+    if (action === "approve" && selected.paymentCategory === "wallet" && !creditPaymentMethodId) {
+      setError("Select the cryptocurrency wallet to credit.");
+      return;
+    }
 
     setIsReviewing(true);
     setError("");
@@ -156,7 +209,13 @@ export function DepositReviewManager() {
       const response = await fetch(
         `${API_ENDPOINTS.frontend.deposits}/${selected.id}/review`,
         {
-          body: JSON.stringify({ action, notes: notes.trim() }),
+          body: JSON.stringify({
+            action,
+            notes: notes.trim(),
+            ...(selected.paymentCategory === "wallet" && {
+              creditPaymentMethodId,
+            }),
+          }),
           headers: { "Content-Type": "application/json" },
           method: "PATCH",
         },
@@ -214,7 +273,7 @@ export function DepositReviewManager() {
       render: (deposit) => (
         <>
           <p className="text-sm font-extrabold text-[var(--color-ink)]">
-            {deposit.amount} {deposit.asset}
+            {deposit.asset === "INR" ? `₹${Number(deposit.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}` : `${deposit.amount} ${deposit.asset}`}
           </p>
           <p className="mt-1 text-[0.66rem] font-semibold text-[var(--color-muted)]">
             {deposit.network}
@@ -410,7 +469,7 @@ export function DepositReviewManager() {
               Deposit verification
             </p>
             <h2 className="mt-2 text-2xl font-extrabold text-[var(--color-ink)]">
-              {selected.amount} {selected.asset}
+              {selected.asset === "INR" ? `₹${Number(selected.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}` : `${selected.amount} ${selected.asset}`}
             </h2>
             <p className="mt-2 text-sm font-semibold text-[var(--color-muted)]">
               {selected.client?.firstName} {selected.client?.lastName} ·{" "}
@@ -420,7 +479,7 @@ export function DepositReviewManager() {
               <dl className="grid gap-4 rounded-2xl bg-[#f5f8f7] p-5 sm:grid-cols-2">
                 <div>
                   <dt className="text-[0.62rem] font-extrabold tracking-[0.1em] text-[var(--color-muted)] uppercase">
-                    Transaction hash
+                    {selected.paymentCategory === "wallet" ? "UPI transaction ID / UTR" : "Transaction hash"}
                   </dt>
                   <dd className="mt-2 break-all text-xs font-bold text-[var(--color-ink)]">
                     {selected.transactionHash}
@@ -428,7 +487,7 @@ export function DepositReviewManager() {
                 </div>
                 <div>
                   <dt className="text-[0.62rem] font-extrabold tracking-[0.1em] text-[var(--color-muted)] uppercase">
-                    Sender wallet
+                    {selected.paymentCategory === "wallet" ? "Payer UPI ID" : "Sender wallet"}
                   </dt>
                   <dd className="mt-2 break-all text-xs font-bold text-[var(--color-ink)]">
                     {selected.senderWalletAddress}
@@ -436,7 +495,7 @@ export function DepositReviewManager() {
                 </div>
                 <div>
                   <dt className="text-[0.62rem] font-extrabold tracking-[0.1em] text-[var(--color-muted)] uppercase">
-                    Receiving wallet
+                    {selected.paymentCategory === "wallet" ? "TradeUply UPI ID" : "Receiving wallet"}
                   </dt>
                   <dd className="mt-2 break-all text-xs font-bold text-[var(--color-ink)]">
                     {selected.destinationWalletAddress}
@@ -452,6 +511,58 @@ export function DepositReviewManager() {
                 </div>
               </dl>
             </div>
+            {selected.paymentCategory === "wallet" &&
+              selected.convertedAmount &&
+              selected.convertedAsset &&
+              selected.exchangeRate && (
+                <section className="mt-7 rounded-2xl border border-[var(--color-brand)]/25 bg-[var(--color-brand-soft)] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[0.62rem] font-extrabold tracking-[0.11em] text-[var(--color-brand-hover)] uppercase">
+                        Approved conversion
+                      </p>
+                      <h3 className="mt-2 text-lg font-extrabold text-[var(--color-ink)]">
+                        ₹{Number(selected.amount).toLocaleString("en-IN", {
+                          maximumFractionDigits: 2,
+                        })} INR → {Number(selected.convertedAmount).toFixed(8)} {selected.convertedAsset}
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1.5 text-[0.65rem] font-extrabold text-[var(--color-brand-hover)]">
+                      Rate locked at approval
+                    </span>
+                  </div>
+                  <dl className="mt-5 grid gap-4 border-t border-[var(--color-brand)]/15 pt-5 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[0.6rem] font-extrabold tracking-[0.09em] text-[var(--color-muted)] uppercase">
+                        Applied exchange rate
+                      </dt>
+                      <dd className="mt-2 text-xs font-extrabold text-[var(--color-ink)]">
+                        1 INR = {Number(selected.exchangeRate).toFixed(12)} {selected.convertedAsset}
+                      </dd>
+                      {Number(selected.exchangeRate) > 0 && (
+                        <dd className="mt-1 text-[0.68rem] font-semibold text-[var(--color-muted)]">
+                          1 {selected.convertedAsset} = ₹{(1 / Number(selected.exchangeRate)).toLocaleString("en-IN", {
+                            maximumFractionDigits: 2,
+                          })}
+                        </dd>
+                      )}
+                    </div>
+                    <div>
+                      <dt className="text-[0.6rem] font-extrabold tracking-[0.09em] text-[var(--color-muted)] uppercase">
+                        Rate captured
+                      </dt>
+                      <dd className="mt-2 text-xs font-extrabold text-[var(--color-ink)]">
+                        {selected.rateQuotedAt
+                          ? new Date(selected.rateQuotedAt).toLocaleString()
+                          : "At approval"}
+                      </dd>
+                      <dd className="mt-1 text-[0.68rem] font-semibold capitalize text-[var(--color-muted)]">
+                        Source: {selected.rateSource ?? "Stored approval quote"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              )}
             <div className="mt-7">
               <div className="flex items-center gap-2">
                 <ClockCounterClockwise
@@ -479,6 +590,41 @@ export function DepositReviewManager() {
             </div>
             {selected.status === "pending" && (
               <div className="mt-7 border-t border-[var(--color-border)] pt-6">
+                {selected.paymentCategory === "wallet" && (
+                  <div className="mb-5 rounded-2xl border border-[var(--color-border)] bg-[#f8faf9] p-4">
+                    <label
+                      className="mb-2 block text-xs font-extrabold text-[var(--color-ink)]"
+                      htmlFor="deposit-credit-method"
+                    >
+                      Credit client crypto wallet
+                    </label>
+                    <CustomSelect
+                      ariaLabel="Credit client crypto wallet"
+                      onChange={setCreditPaymentMethodId}
+                      options={cryptoMethods.map<CustomSelectOption<string>>((method) => ({
+                        label: `${method.asset} · ${method.name}`,
+                        value: method.id,
+                      }))}
+                      value={creditPaymentMethodId}
+                    />
+                    {isLoadingConversion && (
+                      <p className="mt-3 flex items-center gap-2 text-xs font-bold text-[var(--color-muted)]">
+                        <SpinnerGap className="animate-spin" size={16} /> Loading live conversion…
+                      </p>
+                    )}
+                    {conversion && (
+                      <div className="mt-4 rounded-xl bg-[var(--color-brand-soft)] p-4">
+                        <p className="text-[0.62rem] font-extrabold tracking-[0.09em] text-[var(--color-brand-hover)] uppercase">Live conversion preview</p>
+                        <p className="mt-2 text-base font-extrabold text-[var(--color-ink)]">
+                          ₹{Number(selected.amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })} INR ≈ {conversion.convertedAmount.toFixed(8)} {conversion.to.code}
+                        </p>
+                        <p className="mt-2 text-[0.66rem] font-semibold text-[var(--color-muted)]">
+                          1 INR = {conversion.rate.toFixed(12)} {conversion.to.code} · {conversion.source} · refreshed when approved
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <label className="text-xs font-extrabold text-[var(--color-ink)]">
                   Review notes
                   <textarea
@@ -491,7 +637,7 @@ export function DepositReviewManager() {
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <button
                     className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#e3b6aa] text-xs font-extrabold text-[var(--color-danger)] disabled:opacity-60"
-                    disabled={isReviewing}
+                    disabled={isReviewing || (selected.paymentCategory === "wallet" && (!creditPaymentMethodId || !conversion))}
                     onClick={() => review("reject")}
                     type="button"
                   >
@@ -509,7 +655,7 @@ export function DepositReviewManager() {
                     ) : (
                       <Check size={17} weight="bold" />
                     )}
-                    Approve and credit
+                    {selected.paymentCategory === "wallet" ? "Approve, convert and credit" : "Approve and credit"}
                   </button>
                 </div>
               </div>
