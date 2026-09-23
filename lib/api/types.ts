@@ -31,7 +31,7 @@ export type DashboardSummary = {
 };
 
 export type AdminClient = {
-  balance: string;
+  balances: AdminClientBalance[];
   createdAt: string;
   email: string;
   emailVerifiedAt: string | null;
@@ -40,10 +40,10 @@ export type AdminClient = {
   investmentProfile: {
     experience: "New investor" | "Some experience" | "Experienced";
     investmentRange:
-      | "$100–$999"
-      | "$1,000–$4,999"
-      | "$5,000–$24,999"
-      | "$25,000+";
+      | "$50–$249"
+      | "$250–$449"
+      | "$500–$999"
+      | "$1000+";
     objective:
       | "Short-term opportunity"
       | "Portfolio diversification"
@@ -58,7 +58,7 @@ export type AdminClient = {
 
 export type AdminClientBalance = {
   availableBalance: string;
-  currency: "USDT";
+  currency: string;
   lastTransactionAt: string | null;
   lockedBalance: string;
   totalDeposited: string;
@@ -74,7 +74,7 @@ export type AdminBalanceTransaction = {
   description: string;
   direction: "credit" | "debit";
   id: string;
-  type: "deposit" | "withdrawal" | "adjustment";
+  type: "deposit" | "withdrawal" | "adjustment" | "investment";
 };
 
 export type AdminTransaction = AdminBalanceTransaction & {
@@ -94,7 +94,7 @@ export type AdminTransaction = AdminBalanceTransaction & {
 };
 
 export type AdminClientDetails = {
-  balance: AdminClientBalance;
+  balances: AdminClientBalance[];
   client: AdminClient;
   deposits: AdminDeposit[];
   transactions: AdminBalanceTransaction[];
@@ -148,6 +148,7 @@ export type AdminDepositActivity = {
 export type AdminDeposit = {
   activities: AdminDepositActivity[];
   amount: string;
+  asset: string;
   client?: {
     email: string;
     firstName: string;

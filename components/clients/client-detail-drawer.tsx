@@ -186,21 +186,21 @@ export function ClientDetailDrawer({
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3">
                   <p className="text-[0.59rem] font-extrabold tracking-[0.08em] text-white/38 uppercase">
-                    Available
+                    Wallets
                   </p>
                   <p className="mt-2 text-base font-extrabold">
-                    {details.balance.availableBalance}
+                    {details.balances.length}
                   </p>
-                  <p className="mt-0.5 text-[0.62rem] text-white/38">USDT</p>
+                  <p className="mt-0.5 text-[0.62rem] text-white/38">Assets</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3">
                   <p className="text-[0.59rem] font-extrabold tracking-[0.08em] text-white/38 uppercase">
-                    Deposited
+                    Ledger
                   </p>
                   <p className="mt-2 text-base font-extrabold">
-                    {details.balance.totalDeposited}
+                    {details.transactions.length}
                   </p>
-                  <p className="mt-0.5 text-[0.62rem] text-white/38">USDT</p>
+                  <p className="mt-0.5 text-[0.62rem] text-white/38">Entries</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.055] p-3">
                   <p className="text-[0.59rem] font-extrabold tracking-[0.08em] text-white/38 uppercase">
@@ -229,6 +229,36 @@ export function ClientDetailDrawer({
                 {error}
               </p>
             )}
+
+            <section className="mt-5 rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 sm:p-6">
+              <p className="text-[0.62rem] font-extrabold tracking-[0.12em] text-[var(--color-brand-hover)] uppercase">
+                Wallet balances
+              </p>
+              {details.balances.length === 0 ? (
+                <p className="mt-3 text-sm font-medium text-[var(--color-muted)]">
+                  No funded crypto wallets yet.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {details.balances.map((balance) => (
+                    <article
+                      className="rounded-xl border border-[var(--color-border)] bg-[#f8faf9] p-4"
+                      key={balance.currency}
+                    >
+                      <p className="text-[0.64rem] font-extrabold tracking-[0.1em] text-[var(--color-muted)] uppercase">
+                        {balance.currency}
+                      </p>
+                      <p className="mt-2 text-lg font-extrabold text-[var(--color-ink)]">
+                        {balance.availableBalance} {balance.currency}
+                      </p>
+                      <p className="mt-1 text-[0.66rem] font-semibold text-[var(--color-muted)]">
+                        Deposited {balance.totalDeposited} {balance.currency}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
 
             <div className="mt-5 flex gap-2 overflow-x-auto">
               {tabs.map((tab) => (
@@ -359,10 +389,10 @@ export function ClientDetailDrawer({
                         }
                         value={editForm.investmentRange}
                       >
-                        <option>$100–$999</option>
-                        <option>$1,000–$4,999</option>
-                        <option>$5,000–$24,999</option>
-                        <option>$25,000+</option>
+                        <option>$50–$249</option>
+                        <option>$250–$449</option>
+                        <option>$500–$999</option>
+                        <option>$1000+</option>
                       </select>
                     </label>
                     <label className="text-xs font-extrabold sm:col-span-2">
@@ -451,7 +481,7 @@ export function ClientDetailDrawer({
                     Deposit activity
                   </h3>
                   <p className="mt-1 text-xs font-medium text-[var(--color-muted)]">
-                    All submitted USDT deposits for this client.
+                    All submitted cryptocurrency deposits for this client.
                   </p>
                 </div>
                 {details.deposits.length === 0 ? (
@@ -467,7 +497,7 @@ export function ClientDetailDrawer({
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-extrabold text-[var(--color-ink)]">
-                            {deposit.amount} USDT
+                            {deposit.amount} {deposit.asset}
                           </p>
                           <p className="mt-1 text-[0.67rem] font-semibold text-[var(--color-muted)]">
                             {new Date(deposit.createdAt).toLocaleString()} ·{" "}
@@ -525,10 +555,11 @@ export function ClientDetailDrawer({
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-extrabold text-[var(--color-brand-hover)]">
-                          +{transaction.amount}
+                          {transaction.direction === "credit" ? "+" : "−"}
+                          {transaction.amount} {transaction.currency}
                         </p>
                         <p className="mt-1 text-[0.62rem] font-semibold text-[var(--color-muted)]">
-                          Balance {transaction.balanceAfter}
+                          Balance {transaction.balanceAfter} {transaction.currency}
                         </p>
                       </div>
                     </article>

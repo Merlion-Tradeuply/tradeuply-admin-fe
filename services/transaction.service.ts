@@ -16,7 +16,7 @@ export type TransactionSummary = {
   all: number;
   credit: number;
   debit: number;
-  depositedVolume: string;
+  depositedVolumes: Array<{ currency: string; total: string }>;
 };
 
 async function readResponse<T>(response: Response) {

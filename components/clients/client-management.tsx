@@ -166,9 +166,27 @@ export function ClientManagement() {
       key: "balance",
       label: "Current balance",
       render: (client) => (
-        <p className="text-sm font-extrabold text-[var(--color-ink)]">
-          {client.balance} USDT
-        </p>
+        <div className="space-y-1">
+          {client.balances.length > 0 ? (
+            client.balances.slice(0, 2).map((balance) => (
+              <p
+                className="text-sm font-extrabold text-[var(--color-ink)]"
+                key={balance.currency}
+              >
+                {balance.availableBalance} {balance.currency}
+              </p>
+            ))
+          ) : (
+            <p className="text-xs font-bold text-[var(--color-muted)]">
+              No funded wallets
+            </p>
+          )}
+          {client.balances.length > 2 && (
+            <p className="text-[0.64rem] font-bold text-[var(--color-muted)]">
+              +{client.balances.length - 2} more assets
+            </p>
+          )}
+        </div>
       ),
     },
     {

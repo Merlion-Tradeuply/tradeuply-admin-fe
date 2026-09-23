@@ -217,7 +217,7 @@ export function DepositReviewManager() {
       render: (deposit) => (
         <>
           <p className="text-sm font-extrabold text-[var(--color-ink)]">
-            {deposit.amount} USDT
+            {deposit.amount} {deposit.asset}
           </p>
           <p className="mt-1 text-[0.66rem] font-semibold text-[var(--color-muted)]">
             {deposit.network}
@@ -376,7 +376,7 @@ export function DepositReviewManager() {
               Deposit verification
             </p>
             <h2 className="mt-2 text-2xl font-extrabold text-[var(--color-ink)]">
-              {selected.amount} USDT
+              {selected.amount} {selected.asset}
             </h2>
             <p className="mt-2 text-sm font-semibold text-[var(--color-muted)]">
               {selected.client?.firstName} {selected.client?.lastName} ·{" "}

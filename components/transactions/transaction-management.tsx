@@ -41,13 +41,14 @@ const typeOptions: CustomSelectOption<TypeFilter>[] = [
   { label: "Deposits", value: "deposit" },
   { label: "Withdrawals", value: "withdrawal" },
   { label: "Adjustments", value: "adjustment" },
+  { label: "Investments", value: "investment" },
 ];
 
 const emptySummary: TransactionSummary = {
   all: 0,
   credit: 0,
   debit: 0,
-  depositedVolume: "0",
+  depositedVolumes: [],
 };
 
 function formatAmount(value: string) {
@@ -60,6 +61,7 @@ function formatAmount(value: string) {
 function getTypeClasses(type: AdminTransaction["type"]) {
   if (type === "deposit") return "bg-[#e5f8ee] text-[#008c4e]";
   if (type === "withdrawal") return "bg-[#fff0ec] text-[#b74c39]";
+  if (type === "investment") return "bg-[#e8f7ff] text-[#176b8c]";
   return "bg-[#eef2ff] text-[#5363b8]";
 }
 
@@ -340,8 +342,15 @@ export function TransactionManagement() {
           <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">
             Deposited volume
           </span>
-          <span className="mt-2 block text-2xl font-extrabold text-[var(--color-ink)]">
-            {formatAmount(String(summary.depositedVolume))} USDT
+          <span className="mt-2 block text-sm font-extrabold text-[var(--color-ink)]">
+            {summary.depositedVolumes.length > 0
+              ? summary.depositedVolumes
+                  .map(
+                    ({ currency, total }) =>
+                      `${formatAmount(total)} ${currency}`,
+                  )
+                  .join(" · ")
+              : "No approved deposits"}
           </span>
         </div>
       </section>

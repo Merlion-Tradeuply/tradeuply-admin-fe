@@ -347,7 +347,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                 className="mt-2 h-13 w-full rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-4 text-sm font-bold outline-none focus:border-[var(--color-brand)]"
                 maxLength={80}
                 onChange={(event) => updateName(event.target.value)}
-                placeholder="e.g. USDT (Tether)"
+                placeholder="e.g. Bitcoin"
                 required
                 value={form.name}
               />
@@ -363,7 +363,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                   updateField("code", createSlug(event.target.value));
                 }}
                 pattern="[a-z0-9-]+"
-                placeholder="usdt"
+                placeholder="bitcoin"
                 required
                 value={form.code}
               />
@@ -479,7 +479,7 @@ export function PaymentMethodForm({ methodId }: { methodId?: string }) {
                 onChange={(event) =>
                   updateField("asset", event.target.value.toUpperCase())
                 }
-                placeholder={form.category === "crypto" ? "USDT" : "USD"}
+                placeholder={form.category === "crypto" ? "BTC" : "USD"}
                 value={form.asset}
               />
             </label>
