@@ -105,7 +105,45 @@ export type AdminClientDetails = {
   balances: AdminClientBalance[];
   client: AdminClient;
   deposits: AdminDeposit[];
+  investments: AdminClientInvestment[];
   transactions: AdminBalanceTransaction[];
+};
+
+export type AdminClientInvestment = {
+  amountUsd: string;
+  capitalReturnedAt: string | null;
+  createdAt: string;
+  daysCompleted: number;
+  daysRemaining: number;
+  exchangeRate: string;
+  id: string;
+  maturesAt: string;
+  plan: {
+    allocation: string;
+    dailyObjective: number;
+    horizonDays: number;
+    name: string;
+    risk: string;
+    slug: string;
+  };
+  profit: {
+    accruedDays: number;
+    availableUsd: string;
+    availableWalletAmount: string;
+    dailyUsd: string;
+    dailyWalletAmount: string;
+    totalAccruedUsd: string;
+    totalAccruedWalletAmount: string;
+    withdrawnUsd: string;
+    withdrawnWalletAmount: string;
+  };
+  progressPercent: number;
+  projectedProfitUsd: string;
+  projectedTotalUsd: string;
+  startsAt: string;
+  status: "active" | "matured" | "completed" | "cancelled";
+  walletAmount: string;
+  walletCurrency: string;
 };
 
 export type AdminPaymentMethod = {

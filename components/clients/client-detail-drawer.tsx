@@ -20,7 +20,7 @@ import {
   type ClientUpdatePayload,
 } from "@/services/client-management.service";
 
-const tabs = ["overview", "deposits", "ledger"] as const;
+const tabs = ["overview", "portfolio", "deposits", "ledger"] as const;
 type DetailTab = (typeof tabs)[number];
 
 function createEditForm(client: AdminClient): ClientUpdatePayload {
@@ -513,6 +513,114 @@ export function ClientDetailDrawer({
                       </p>
                     </article>
                   ))
+                )}
+              </section>
+            )}
+
+            {activeTab === "portfolio" && (
+              <section className="mt-5 overflow-hidden rounded-[1.5rem] border border-[var(--color-border)] bg-white">
+                <div className="border-b border-[var(--color-border)] p-5">
+                  <h3 className="font-extrabold text-[var(--color-ink)]">
+                    Investment portfolio
+                  </h3>
+                  <p className="mt-1 text-xs font-medium text-[var(--color-muted)]">
+                    Every investment created by this client and its current lifecycle.
+                  </p>
+                </div>
+                {details.investments.length === 0 ? (
+                  <p className="p-6 text-sm font-medium text-[var(--color-muted)]">
+                    No investments created yet.
+                  </p>
+                ) : (
+                  <div className="grid gap-4 p-5">
+                    {details.investments.map((investment) => (
+                      <article
+                        className="rounded-2xl border border-[var(--color-border)] bg-[#f8faf9] p-4 sm:p-5"
+                        key={investment.id}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[0.62rem] font-extrabold tracking-[0.1em] text-[var(--color-brand-hover)] uppercase">
+                              {investment.plan.risk} risk · {investment.plan.horizonDays} days
+                            </p>
+                            <h4 className="mt-1 text-base font-extrabold text-[var(--color-ink)]">
+                              {investment.plan.name}
+                            </h4>
+                          </div>
+                          <span className={cn(
+                            "rounded-full px-3 py-1.5 text-[0.63rem] font-extrabold capitalize",
+                            investment.status === "active"
+                              ? "bg-[#e5f8ee] text-[#008c4e]"
+                              : investment.status === "matured"
+                                ? "bg-[#fff6df] text-[#946515]"
+                                : investment.status === "completed"
+                                  ? "bg-[#e8f0ff] text-[#315ea8]"
+                                  : "bg-[#fff0ec] text-[#b74c39]",
+                          )}>
+                            {investment.status}
+                          </span>
+                        </div>
+
+                        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl bg-white p-3.5">
+                            <dt className="text-[0.59rem] font-extrabold tracking-[0.08em] text-[var(--color-muted)] uppercase">
+                              Invested capital
+                            </dt>
+                            <dd className="mt-1.5 text-sm font-extrabold text-[var(--color-ink)]">
+                              ${Number(investment.amountUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </dd>
+                            <dd className="mt-1 text-[0.65rem] font-semibold text-[var(--color-muted)]">
+                              {investment.walletAmount} {investment.walletCurrency}
+                            </dd>
+                          </div>
+                          <div className="rounded-xl bg-white p-3.5">
+                            <dt className="text-[0.59rem] font-extrabold tracking-[0.08em] text-[var(--color-muted)] uppercase">
+                              Profit accrued
+                            </dt>
+                            <dd className="mt-1.5 text-sm font-extrabold text-[var(--color-brand-hover)]">
+                              ${Number(investment.profit.totalAccruedUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </dd>
+                            <dd className="mt-1 text-[0.65rem] font-semibold text-[var(--color-muted)]">
+                              ${Number(investment.profit.availableUsd).toFixed(2)} available · ${Number(investment.profit.withdrawnUsd).toFixed(2)} withdrawn
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between gap-4 text-[0.66rem] font-bold text-[var(--color-muted)]">
+                            <span>Day {investment.daysCompleted} of {investment.plan.horizonDays}</span>
+                            <span>{investment.progressPercent}%</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2ebe7]">
+                            <div
+                              className="h-full rounded-full bg-[var(--color-brand)]"
+                              style={{ width: `${investment.progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <dl className="mt-4 grid gap-3 border-t border-[var(--color-border)] pt-4 text-xs sm:grid-cols-2">
+                          <div>
+                            <dt className="font-semibold text-[var(--color-muted)]">Start date</dt>
+                            <dd className="mt-1 font-extrabold text-[var(--color-ink)]">
+                              {new Date(investment.startsAt).toLocaleString()}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold text-[var(--color-muted)]">Maturity date</dt>
+                            <dd className="mt-1 font-extrabold text-[var(--color-ink)]">
+                              {new Date(investment.maturesAt).toLocaleString()}
+                            </dd>
+                          </div>
+                        </dl>
+                        {investment.capitalReturnedAt && (
+                          <p className="mt-4 rounded-xl bg-[#e8f0ff] p-3 text-[0.68rem] font-bold text-[#315ea8]">
+                            Capital returned on {new Date(investment.capitalReturnedAt).toLocaleString()}.
+                          </p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
                 )}
               </section>
             )}
