@@ -23,9 +23,18 @@ type ApiResponse<T> = {
 
 export type PaymentMethodFilters = {
   category?: "bank" | "card" | "crypto" | "wallet";
+  limit?: number;
+  page?: number;
   query?: string;
   sort?: "display-order" | "name-asc" | "name-desc";
   status?: "active" | "coming_soon" | "disabled";
+};
+
+export type PaymentMethodPagination = {
+  limit: number;
+  page: number;
+  pages: number;
+  total: number;
 };
 
 export type PaymentMethodSummary = {
@@ -51,6 +60,8 @@ export async function getPaymentMethods(filters: PaymentMethodFilters = {}) {
   const parameters = new URLSearchParams();
 
   if (filters.category) parameters.set("category", filters.category);
+  if (filters.limit) parameters.set("limit", String(filters.limit));
+  if (filters.page) parameters.set("page", String(filters.page));
   if (filters.query?.trim()) parameters.set("q", filters.query.trim());
   if (filters.sort) parameters.set("sort", filters.sort);
   if (filters.status) parameters.set("status", filters.status);
@@ -61,6 +72,7 @@ export async function getPaymentMethods(filters: PaymentMethodFilters = {}) {
   );
   const result = await readResponse<{
     methods: AdminPaymentMethod[];
+    pagination: PaymentMethodPagination;
     summary: PaymentMethodSummary;
   }>(response);
   return result.data!;

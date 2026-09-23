@@ -11,6 +11,27 @@ export type ClientUpdatePayload = {
   status: AdminClient["status"];
 };
 
+export type ClientFilters = {
+  limit?: number;
+  page?: number;
+  query?: string;
+  status?: "all" | AdminClient["status"];
+};
+
+export type ClientPagination = {
+  limit: number;
+  page: number;
+  pages: number;
+  total: number;
+};
+
+export type ClientSummary = {
+  active: number;
+  all: number;
+  pending_verification: number;
+  suspended: number;
+};
+
 type ApiResponse<T> = {
   data?: T;
   error?: { message: string };
@@ -28,9 +49,22 @@ async function readResponse<T>(response: Response) {
   return result.data;
 }
 
-export async function getClients() {
-  const response = await fetch(API_ENDPOINTS.frontend.clients);
-  return (await readResponse<{ clients: AdminClient[] }>(response)).clients;
+export async function getClients(filters: ClientFilters = {}) {
+  const parameters = new URLSearchParams();
+  if (filters.limit) parameters.set("limit", String(filters.limit));
+  if (filters.page) parameters.set("page", String(filters.page));
+  if (filters.query?.trim()) parameters.set("query", filters.query.trim());
+  if (filters.status) parameters.set("status", filters.status);
+
+  const queryString = parameters.toString();
+  const response = await fetch(
+    `${API_ENDPOINTS.frontend.clients}${queryString ? `?${queryString}` : ""}`,
+  );
+  return readResponse<{
+    clients: AdminClient[];
+    pagination: ClientPagination;
+    summary: ClientSummary;
+  }>(response);
 }
 
 export async function getClientDetails(clientId: string) {

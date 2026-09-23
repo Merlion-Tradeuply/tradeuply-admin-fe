@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  CaretLeft,
+  CaretRight,
   Eye,
   MagnifyingGlass,
   SpinnerGap,
@@ -8,7 +10,7 @@ import {
   UsersThree,
   X,
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ClientDetailDrawer } from "@/components/clients/client-detail-drawer";
 import {
@@ -20,6 +22,8 @@ import { cn } from "@/lib/utils";
 import {
   deleteClients,
   getClients,
+  type ClientPagination,
+  type ClientSummary,
 } from "@/services/client-management.service";
 
 const statuses = [
@@ -37,6 +41,20 @@ const statusLabels: Record<StatusFilter, string> = {
   suspended: "Suspended",
 };
 
+const emptyPagination: ClientPagination = {
+  limit: 10,
+  page: 1,
+  pages: 1,
+  total: 0,
+};
+
+const emptySummary: ClientSummary = {
+  active: 0,
+  all: 0,
+  pending_verification: 0,
+  suspended: 0,
+};
+
 function getStatusClasses(status: AdminClient["status"]) {
   if (status === "active") return "bg-[#e5f8ee] text-[#008c4e]";
   if (status === "suspended") return "bg-[#fff0ec] text-[#b74c39]";
@@ -45,50 +63,63 @@ function getStatusClasses(status: AdminClient["status"]) {
 
 export function ClientManagement() {
   const [clients, setClients] = useState<AdminClient[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [error, setError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] =
+    useState<ClientPagination>(emptyPagination);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [summary, setSummary] = useState<ClientSummary>(emptySummary);
 
   useEffect(() => {
-    getClients()
-      .then(setClients)
-      .catch((requestError: Error) => setError(requestError.message))
-      .finally(() => setIsLoading(false));
-  }, []);
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
 
-  const filteredClients = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return clients.filter((client) => {
-      const matchesStatus = status === "all" || client.status === status;
-      const matchesSearch =
-        !normalizedQuery ||
-        [client.firstName, client.lastName, client.email, client.phone]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
-      return matchesStatus && matchesSearch;
-    });
-  }, [clients, query, status]);
+  useEffect(() => {
+    let ignoreResult = false;
+    const requestTimeout = window.setTimeout(() => {
+      setIsLoading(true);
+      setError("");
+      setSelectedIds([]);
 
-  const statusCounts = useMemo(
-    () => ({
-      active: clients.filter((client) => client.status === "active").length,
-      all: clients.length,
-      pending_verification: clients.filter(
-        (client) => client.status === "pending_verification",
-      ).length,
-      suspended: clients.filter((client) => client.status === "suspended")
-        .length,
-    }),
-    [clients],
-  );
+      getClients({
+        limit: 10,
+        page,
+        query: debouncedQuery,
+        status,
+      })
+        .then((result) => {
+          if (ignoreResult) return;
+          setClients(result.clients);
+          setPagination(result.pagination);
+          setSummary(result.summary);
+        })
+        .catch((requestError: Error) => {
+          if (!ignoreResult) setError(requestError.message);
+        })
+        .finally(() => {
+          if (!ignoreResult) setIsLoading(false);
+        });
+    }, 0);
 
-  const visibleIds = filteredClients.map((client) => client.id);
+    return () => {
+      ignoreResult = true;
+      window.clearTimeout(requestTimeout);
+    };
+  }, [debouncedQuery, page, reloadKey, status]);
+
+  const visibleIds = clients.map((client) => client.id);
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
 
@@ -108,13 +139,15 @@ export function ClientManagement() {
     );
   }
 
-  function removeClientsFromView(clientIds: string[]) {
-    setClients((current) =>
-      current.filter((client) => !clientIds.includes(client.id)),
-    );
+  function refreshAfterDeletion(clientIds: string[]) {
     setSelectedIds((current) =>
       current.filter((id) => !clientIds.includes(id)),
     );
+    if (clientIds.length >= clients.length && page > 1) {
+      setPage((current) => current - 1);
+    } else {
+      setReloadKey((current) => current + 1);
+    }
   }
 
   async function confirmBulkDeletion() {
@@ -122,7 +155,7 @@ export function ClientManagement() {
     setError("");
     try {
       await deleteClients(pendingDeleteIds);
-      removeClientsFromView(pendingDeleteIds);
+      refreshAfterDeletion(pendingDeleteIds);
       setPendingDeleteIds([]);
     } catch (requestError) {
       setError(
@@ -270,14 +303,17 @@ export function ClientManagement() {
                 : "border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40",
             )}
             key={item}
-            onClick={() => setStatus(item)}
+            onClick={() => {
+              setStatus(item);
+              setPage(1);
+            }}
             type="button"
           >
             <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">
               {statusLabels[item]}
             </span>
             <span className="mt-2 block text-2xl font-extrabold text-[var(--color-ink)]">
-              {statusCounts[item]}
+              {summary[item]}
             </span>
           </button>
         ))}
@@ -320,7 +356,7 @@ export function ClientManagement() {
           getRowId={(client) => client.id}
           isLoading={isLoading}
           minWidthClassName="min-w-[920px]"
-          rows={filteredClients}
+          rows={clients}
           selection={{
             getLabel: (clientId, isSelected) => {
               const client = clients.find((item) => item.id === clientId);
@@ -332,12 +368,46 @@ export function ClientManagement() {
           }}
         />
 
-        {!isLoading && filteredClients.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
-            <span>
-              Showing {filteredClients.length} of {clients.length} clients
-            </span>
-            <span>{selectedIds.length} selected</span>
+        {!isLoading && clients.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span>
+                Showing {(pagination.page - 1) * pagination.limit + 1}–
+                {Math.min(
+                  pagination.page * pagination.limit,
+                  pagination.total,
+                )}{" "}
+                of {pagination.total} clients
+              </span>
+              <span>{selectedIds.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Previous client page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                type="button"
+              >
+                <CaretLeft size={15} weight="bold" />
+              </button>
+              <span className="min-w-20 text-center text-[0.7rem] text-[var(--color-ink-soft)]">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <button
+                aria-label="Next client page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.pages, current + 1),
+                  )
+                }
+                type="button"
+              >
+                <CaretRight size={15} weight="bold" />
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -347,14 +417,15 @@ export function ClientManagement() {
           clientId={selectedClientId}
           key={selectedClientId}
           onClose={() => setSelectedClientId(null)}
-          onDeleted={(clientId) => removeClientsFromView([clientId])}
-          onUpdated={(updatedClient) =>
+          onDeleted={(clientId) => refreshAfterDeletion([clientId])}
+          onUpdated={(updatedClient) => {
             setClients((current) =>
               current.map((client) =>
                 client.id === updatedClient.id ? updatedClient : client,
               ),
-            )
-          }
+            );
+            setReloadKey((current) => current + 1);
+          }}
         />
       )}
 

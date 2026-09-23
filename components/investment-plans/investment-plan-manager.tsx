@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  CaretLeft,
+  CaretRight,
   MagnifyingGlass,
   PencilSimple,
   SpinnerGap,
@@ -18,6 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   deleteInvestmentPlans,
   getInvestmentPlans,
+  type InvestmentPlanPagination,
   type InvestmentPlanSummary,
 } from "@/services/investment-plan.service";
 
@@ -45,6 +48,12 @@ const emptySummary: InvestmentPlanSummary = {
   disabled: 0,
   featured: 0,
 };
+const emptyPagination: InvestmentPlanPagination = {
+  limit: 10,
+  page: 1,
+  pages: 1,
+  total: 0,
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -65,6 +74,9 @@ export function InvestmentPlanManager() {
   const [error, setError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] =
+    useState<InvestmentPlanPagination>(emptyPagination);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [plans, setPlans] = useState<AdminInvestmentPlan[]>([]);
   const [query, setQuery] = useState("");
@@ -77,7 +89,10 @@ export function InvestmentPlanManager() {
   const [summary, setSummary] = useState<InvestmentPlanSummary>(emptySummary);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedQuery(query), 350);
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
     return () => window.clearTimeout(timeout);
   }, [query]);
 
@@ -88,6 +103,8 @@ export function InvestmentPlanManager() {
       setError("");
       setSelectedIds([]);
       getInvestmentPlans({
+        limit: 10,
+        page,
         query: debouncedQuery,
         risk: risk === "all" ? undefined : risk,
         sort,
@@ -95,6 +112,7 @@ export function InvestmentPlanManager() {
       })
         .then((result) => {
           if (ignore) return;
+          setPagination(result.pagination);
           setPlans(result.plans);
           setRisks(result.risks);
           setSummary(result.summary);
@@ -110,7 +128,7 @@ export function InvestmentPlanManager() {
       ignore = true;
       window.clearTimeout(timeout);
     };
-  }, [debouncedQuery, reloadKey, risk, sort, status]);
+  }, [debouncedQuery, page, reloadKey, risk, sort, status]);
 
   const visibleIds = plans.map((plan) => plan.id);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
@@ -136,7 +154,11 @@ export function InvestmentPlanManager() {
     setError("");
     try {
       await deleteInvestmentPlans(pendingDeleteIds);
+      const deletedCurrentPage =
+        pendingDeleteIds.length >= plans.length && page > 1;
       setPendingDeleteIds([]);
+      setSelectedIds([]);
+      if (deletedCurrentPage) setPage((current) => current - 1);
       setReloadKey((current) => current + 1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The plans could not be deleted.");
@@ -196,7 +218,7 @@ export function InvestmentPlanManager() {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {statuses.map((item) => (
-          <button className={cn("rounded-2xl border p-5 text-left transition", status === item ? "border-[var(--color-brand)] bg-[var(--color-brand-soft)]" : "border-[var(--color-border)] bg-white")} key={item} onClick={() => setStatus(item)} type="button">
+          <button className={cn("rounded-2xl border p-5 text-left transition", status === item ? "border-[var(--color-brand)] bg-[var(--color-brand-soft)]" : "border-[var(--color-border)] bg-white")} key={item} onClick={() => { setStatus(item); setPage(1); }} type="button">
             <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">{labels[item]}</span>
             <span className="mt-2 block text-2xl font-extrabold text-[var(--color-ink)]">{summary[item]}</span>
           </button>
@@ -206,12 +228,31 @@ export function InvestmentPlanManager() {
       <section className="mt-5 overflow-visible rounded-[1.6rem] border border-[var(--color-border)] bg-white shadow-[0_18px_55px_rgba(18,45,72,0.06)]">
         <div className="grid gap-3 border-b border-[var(--color-border)] p-4 sm:p-5 xl:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]">
           <label className="relative"><MagnifyingGlass className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--color-muted)]" size={18} /><span className="sr-only">Search investment plans</span><input className="h-12 w-full rounded-xl border border-[var(--color-border)] bg-[#f8faf9] pr-4 pl-11 text-sm font-semibold outline-none focus:border-[var(--color-brand)]" onChange={(event) => setQuery(event.target.value)} placeholder="Search name, slug, risk, or strategy" type="search" value={query} /></label>
-          <CustomSelect ariaLabel="Filter by risk" onChange={setRisk} options={riskOptions} value={risk} />
-          <CustomSelect ariaLabel="Sort investment plans" onChange={setSort} options={sortOptions} value={sort} />
+          <CustomSelect ariaLabel="Filter by risk" onChange={(value) => { setRisk(value); setPage(1); }} options={riskOptions} value={risk} />
+          <CustomSelect ariaLabel="Sort investment plans" onChange={(value) => { setSort(value); setPage(1); }} options={sortOptions} value={sort} />
           <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#efc8c0] px-4 text-xs font-extrabold text-[var(--color-danger)] disabled:opacity-40" disabled={selectedIds.length === 0} onClick={() => setPendingDeleteIds(selectedIds)} type="button"><Trash size={17} /> Delete selected {selectedIds.length ? `(${selectedIds.length})` : ""}</button>
         </div>
         <DataTable caption="TradeUply investment plans" columns={columns} emptyDescription="Adjust the search or filters, or create a new plan." emptyIcon={<MagnifyingGlass size={30} />} emptyTitle="No investment plans found" getRowId={(plan) => plan.id} isLoading={isLoading} rows={plans} selection={{ getLabel: (id, selected) => `${selected ? "Deselect" : "Select"} ${plans.find((plan) => plan.id === id)?.name ?? "plan"}`, onToggle: toggleSelection, onToggleAll: toggleAll, selectedIds }} />
-        {!isLoading && plans.length > 0 && <div className="flex justify-between border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]"><span>Showing {plans.length} of {summary.all} plans</span><span>{selectedIds.length} selected</span></div>}
+        {!isLoading && plans.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span>
+                Showing {(pagination.page - 1) * pagination.limit + 1}–
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} plans
+              </span>
+              <span>{selectedIds.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button aria-label="Previous investment-plan page" className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">
+                <CaretLeft size={15} weight="bold" />
+              </button>
+              <span className="min-w-20 text-center text-[0.7rem] text-[var(--color-ink-soft)]">Page {pagination.page} of {pagination.pages}</span>
+              <button aria-label="Next investment-plan page" className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40" disabled={pagination.page >= pagination.pages} onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))} type="button">
+                <CaretRight size={15} weight="bold" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {pendingDeleteIds.length > 0 && (

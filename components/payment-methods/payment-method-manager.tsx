@@ -2,6 +2,8 @@
 
 import {
   Bank,
+  CaretLeft,
+  CaretRight,
   CreditCard,
   CurrencyCircleDollar,
   MagnifyingGlass,
@@ -28,6 +30,7 @@ import { cn } from "@/lib/utils";
 import {
   deletePaymentMethods,
   getPaymentMethods,
+  type PaymentMethodPagination,
   type PaymentMethodSummary,
 } from "@/services/payment-method.service";
 import { useAppSelector } from "@/store/hooks";
@@ -72,6 +75,13 @@ const emptySummary: PaymentMethodSummary = {
   disabled: 0,
 };
 
+const emptyPagination: PaymentMethodPagination = {
+  limit: 10,
+  page: 1,
+  pages: 1,
+  total: 0,
+};
+
 function getStatusClasses(status: AdminPaymentMethod["status"]) {
   if (status === "active") return "bg-[#e5f8ee] text-[#008c4e]";
   if (status === "disabled") return "bg-[#f1f3f5] text-[#6e7b8a]";
@@ -86,6 +96,9 @@ export function PaymentMethodManager() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] =
+    useState<PaymentMethodPagination>(emptyPagination);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -97,7 +110,10 @@ export function PaymentMethodManager() {
   const canEdit = user?.roles.includes("super-admin") ?? false;
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedQuery(query), 350);
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
     return () => window.clearTimeout(timeout);
   }, [query]);
 
@@ -110,6 +126,8 @@ export function PaymentMethodManager() {
 
       getPaymentMethods({
         category: category === "all" ? undefined : category,
+        limit: 10,
+        page,
         query: debouncedQuery,
         sort,
         status: status === "all" ? undefined : status,
@@ -117,6 +135,7 @@ export function PaymentMethodManager() {
         .then((result) => {
           if (ignoreResult) return;
           setMethods(result.methods);
+          setPagination(result.pagination);
           setStatusCounts(result.summary);
         })
         .catch((requestError: Error) => {
@@ -131,7 +150,7 @@ export function PaymentMethodManager() {
       ignoreResult = true;
       window.clearTimeout(requestTimeout);
     };
-  }, [category, debouncedQuery, reloadKey, sort, status]);
+  }, [category, debouncedQuery, page, reloadKey, sort, status]);
 
   const visibleIds = methods.map((method) => method.id);
   const allVisibleSelected =
@@ -159,8 +178,11 @@ export function PaymentMethodManager() {
 
     try {
       await deletePaymentMethods(pendingDeleteIds);
+      const deletedCurrentPage =
+        pendingDeleteIds.length >= methods.length && page > 1;
       setSelectedIds([]);
       setPendingDeleteIds([]);
+      if (deletedCurrentPage) setPage((current) => current - 1);
       setReloadKey((current) => current + 1);
     } catch (requestError) {
       setError(
@@ -306,7 +328,10 @@ export function PaymentMethodManager() {
                 : "border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40",
             )}
             key={option}
-            onClick={() => setStatus(option)}
+            onClick={() => {
+              setStatus(option);
+              setPage(1);
+            }}
             type="button"
           >
             <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">
@@ -338,13 +363,19 @@ export function PaymentMethodManager() {
             </label>
             <CustomSelect
               ariaLabel="Filter by category"
-              onChange={setCategory}
+              onChange={(value) => {
+                setCategory(value);
+                setPage(1);
+              }}
               options={categoryOptions}
               value={category}
             />
             <CustomSelect
               ariaLabel="Sort payment methods"
-              onChange={setSort}
+              onChange={(value) => {
+                setSort(value);
+                setPage(1);
+              }}
               options={sortOptions}
               value={sort}
             />
@@ -382,11 +413,45 @@ export function PaymentMethodManager() {
         />
 
         {!isLoading && methods.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
-            <span>
-              Showing {methods.length} of {statusCounts.all} methods
-            </span>
-            <span>{selectedIds.length} selected</span>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span>
+                Showing {(pagination.page - 1) * pagination.limit + 1}–
+                {Math.min(
+                  pagination.page * pagination.limit,
+                  pagination.total,
+                )}{" "}
+                of {pagination.total} methods
+              </span>
+              <span>{selectedIds.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Previous payment-method page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                type="button"
+              >
+                <CaretLeft size={15} weight="bold" />
+              </button>
+              <span className="min-w-20 text-center text-[0.7rem] text-[var(--color-ink-soft)]">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <button
+                aria-label="Next payment-method page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.pages, current + 1),
+                  )
+                }
+                type="button"
+              >
+                <CaretRight size={15} weight="bold" />
+              </button>
+            </div>
           </div>
         )}
       </section>

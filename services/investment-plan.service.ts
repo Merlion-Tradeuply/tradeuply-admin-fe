@@ -5,10 +5,19 @@ type ApiResponse<T> = { data?: T; error?: { message: string } };
 
 export type InvestmentPlanFilters = {
   featured?: boolean;
+  limit?: number;
+  page?: number;
   query?: string;
   risk?: string;
   sort?: "display-order" | "minimum-asc" | "minimum-desc" | "name-asc" | "name-desc";
   status?: AdminInvestmentPlan["status"];
+};
+
+export type InvestmentPlanPagination = {
+  limit: number;
+  page: number;
+  pages: number;
+  total: number;
 };
 
 export type InvestmentPlanSummary = {
@@ -34,6 +43,8 @@ async function readResponse<T>(response: Response) {
 export async function getInvestmentPlans(filters: InvestmentPlanFilters = {}) {
   const parameters = new URLSearchParams();
   if (filters.featured !== undefined) parameters.set("featured", String(filters.featured));
+  if (filters.limit) parameters.set("limit", String(filters.limit));
+  if (filters.page) parameters.set("page", String(filters.page));
   if (filters.query?.trim()) parameters.set("q", filters.query.trim());
   if (filters.risk) parameters.set("risk", filters.risk);
   if (filters.sort) parameters.set("sort", filters.sort);
@@ -43,6 +54,7 @@ export async function getInvestmentPlans(filters: InvestmentPlanFilters = {}) {
     `${API_ENDPOINTS.frontend.investmentPlans}${query ? `?${query}` : ""}`,
   );
   return readResponse<{
+    pagination: InvestmentPlanPagination;
     plans: AdminInvestmentPlan[];
     risks: string[];
     summary: InvestmentPlanSummary;

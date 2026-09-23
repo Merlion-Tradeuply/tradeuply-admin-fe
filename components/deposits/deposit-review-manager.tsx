@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  CaretLeft,
+  CaretRight,
   Check,
   ClockCounterClockwise,
   Eye,
@@ -9,7 +11,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   DataTable,
@@ -31,31 +33,74 @@ const statusLabels = {
   pending: "Pending review",
   rejected: "Rejected",
 };
+type DepositStatusFilter = (typeof statuses)[number];
+type DepositPagination = {
+  limit: number;
+  page: number;
+  pages: number;
+  total: number;
+};
+type DepositSummary = Record<DepositStatusFilter, number>;
+
+const emptyPagination: DepositPagination = {
+  limit: 10,
+  page: 1,
+  pages: 1,
+  total: 0,
+};
+
+const emptySummary: DepositSummary = {
+  all: 0,
+  approved: 0,
+  pending: 0,
+  rejected: 0,
+};
 
 export function DepositReviewManager() {
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [deposits, setDeposits] = useState<AdminDeposit[]>([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewing, setIsReviewing] = useState(false);
   const [notes, setNotes] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] =
+    useState<DepositPagination>(emptyPagination);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AdminDeposit | null>(null);
-  const [status, setStatus] = useState<(typeof statuses)[number]>("pending");
+  const [status, setStatus] = useState<DepositStatusFilter>("pending");
+  const [summary, setSummary] = useState<DepositSummary>(emptySummary);
 
   const loadDeposits = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
+      const parameters = new URLSearchParams({
+        limit: "10",
+        page: String(page),
+        q: debouncedQuery,
+        status,
+      });
       const response = await fetch(
-        `${API_ENDPOINTS.frontend.deposits}?status=all`,
+        `${API_ENDPOINTS.frontend.deposits}?${parameters.toString()}`,
       );
       const result = (await response.json()) as {
-        data?: { deposits: AdminDeposit[] };
+        data?: {
+          deposits: AdminDeposit[];
+          pagination: DepositPagination;
+          summary: DepositSummary;
+        };
         error?: { message: string };
       };
       if (!response.ok || !result.data)
         throw new Error(result.error?.message ?? "Unable to load deposits.");
+      if (page > result.data.pagination.pages) {
+        setPage(result.data.pagination.pages);
+        return;
+      }
       setDeposits(result.data.deposits);
+      setPagination(result.data.pagination);
+      setSummary(result.data.summary);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -65,69 +110,22 @@ export function DepositReviewManager() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [debouncedQuery, page, status]);
 
   useEffect(() => {
-    let active = true;
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
 
-    fetch(`${API_ENDPOINTS.frontend.deposits}?status=all`)
-      .then(async (response) => {
-        const result = (await response.json()) as {
-          data?: { deposits: AdminDeposit[] };
-          error?: { message: string };
-        };
-        if (!response.ok || !result.data)
-          throw new Error(result.error?.message ?? "Unable to load deposits.");
-        if (active) setDeposits(result.data.deposits);
-      })
-      .catch((requestError: Error) => {
-        if (active) setError(requestError.message);
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const filteredDeposits = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return deposits.filter((deposit) => {
-      const matchesStatus = status === "all" || deposit.status === status;
-      const matchesSearch =
-        !normalizedQuery ||
-        [
-          deposit.client?.firstName,
-          deposit.client?.lastName,
-          deposit.client?.email,
-          deposit.transactionHash,
-          deposit.senderWalletAddress,
-          deposit.amount,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedQuery);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [deposits, query, status]);
-
-  const statusCounts = useMemo(
-    () => ({
-      all: deposits.length,
-      approved: deposits.filter((deposit) => deposit.status === "approved")
-        .length,
-      pending: deposits.filter((deposit) => deposit.status === "pending")
-        .length,
-      rejected: deposits.filter((deposit) => deposit.status === "rejected")
-        .length,
-    }),
-    [deposits],
-  );
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadDeposits();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [loadDeposits]);
 
   async function openDeposit(deposit: AdminDeposit) {
     setError("");
@@ -300,14 +298,17 @@ export function DepositReviewManager() {
                 : "border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40",
             )}
             key={item}
-            onClick={() => setStatus(item)}
+            onClick={() => {
+              setStatus(item);
+              setPage(1);
+            }}
             type="button"
           >
             <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">
               {statusLabels[item]}
             </span>
             <span className="mt-2 block text-2xl font-extrabold text-[var(--color-ink)]">
-              {statusCounts[item]}
+              {summary[item]}
             </span>
           </button>
         ))}
@@ -345,12 +346,46 @@ export function DepositReviewManager() {
           getRowId={(deposit) => deposit.id}
           isLoading={isLoading}
           minWidthClassName="min-w-[900px]"
-          rows={filteredDeposits}
+          rows={deposits}
         />
 
-        {!isLoading && filteredDeposits.length > 0 && (
-          <div className="border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
-            Showing {filteredDeposits.length} of {deposits.length} deposits
+        {!isLoading && deposits.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
+            <span>
+              Showing {(pagination.page - 1) * pagination.limit + 1}–
+              {Math.min(
+                pagination.page * pagination.limit,
+                pagination.total,
+              )}{" "}
+              of {pagination.total} deposits
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Previous deposit page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                type="button"
+              >
+                <CaretLeft size={15} weight="bold" />
+              </button>
+              <span className="min-w-20 text-center text-[0.7rem] text-[var(--color-ink-soft)]">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <button
+                aria-label="Next deposit page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.pages, current + 1),
+                  )
+                }
+                type="button"
+              >
+                <CaretRight size={15} weight="bold" />
+              </button>
+            </div>
           </div>
         )}
       </section>
