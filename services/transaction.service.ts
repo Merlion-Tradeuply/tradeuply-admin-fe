@@ -8,8 +8,17 @@ type ApiResponse<T> = {
 
 export type TransactionFilters = {
   direction?: AdminTransaction["direction"];
+  limit?: number;
+  page?: number;
   query?: string;
   type?: AdminTransaction["type"];
+};
+
+export type TransactionPagination = {
+  limit: number;
+  page: number;
+  pages: number;
+  total: number;
 };
 
 export type TransactionSummary = {
@@ -34,6 +43,8 @@ async function readResponse<T>(response: Response) {
 export async function getTransactions(filters: TransactionFilters = {}) {
   const parameters = new URLSearchParams();
   if (filters.direction) parameters.set("direction", filters.direction);
+  if (filters.limit) parameters.set("limit", String(filters.limit));
+  if (filters.page) parameters.set("page", String(filters.page));
   if (filters.query?.trim()) parameters.set("q", filters.query.trim());
   if (filters.type) parameters.set("type", filters.type);
 
@@ -42,6 +53,7 @@ export async function getTransactions(filters: TransactionFilters = {}) {
     `${API_ENDPOINTS.frontend.transactions}${queryString ? `?${queryString}` : ""}`,
   );
   return readResponse<{
+    pagination: TransactionPagination;
     summary: TransactionSummary;
     transactions: AdminTransaction[];
   }>(response);

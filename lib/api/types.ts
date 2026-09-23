@@ -74,7 +74,13 @@ export type AdminBalanceTransaction = {
   description: string;
   direction: "credit" | "debit";
   id: string;
-  type: "deposit" | "withdrawal" | "adjustment" | "investment";
+  type:
+    | "deposit"
+    | "withdrawal"
+    | "adjustment"
+    | "investment"
+    | "capital_return"
+    | "profit_withdrawal";
 };
 
 export type AdminTransaction = AdminBalanceTransaction & {

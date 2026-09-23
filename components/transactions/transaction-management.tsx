@@ -3,6 +3,8 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  CaretLeft,
+  CaretRight,
   MagnifyingGlass,
   Receipt,
   SpinnerGap,
@@ -24,6 +26,7 @@ import { cn } from "@/lib/utils";
 import {
   deleteTransactions,
   getTransactions,
+  type TransactionPagination,
   type TransactionSummary,
 } from "@/services/transaction.service";
 
@@ -42,6 +45,8 @@ const typeOptions: CustomSelectOption<TypeFilter>[] = [
   { label: "Withdrawals", value: "withdrawal" },
   { label: "Adjustments", value: "adjustment" },
   { label: "Investments", value: "investment" },
+  { label: "Capital returns", value: "capital_return" },
+  { label: "Profit withdrawals", value: "profit_withdrawal" },
 ];
 
 const emptySummary: TransactionSummary = {
@@ -49,6 +54,13 @@ const emptySummary: TransactionSummary = {
   credit: 0,
   debit: 0,
   depositedVolumes: [],
+};
+
+const emptyPagination: TransactionPagination = {
+  limit: 10,
+  page: 1,
+  pages: 1,
+  total: 0,
 };
 
 function formatAmount(value: string) {
@@ -62,6 +74,8 @@ function getTypeClasses(type: AdminTransaction["type"]) {
   if (type === "deposit") return "bg-[#e5f8ee] text-[#008c4e]";
   if (type === "withdrawal") return "bg-[#fff0ec] text-[#b74c39]";
   if (type === "investment") return "bg-[#e8f7ff] text-[#176b8c]";
+  if (type === "capital_return") return "bg-[#f0ecff] text-[#6850a8]";
+  if (type === "profit_withdrawal") return "bg-[#fff5d9] text-[#8a6500]";
   return "bg-[#eef2ff] text-[#5363b8]";
 }
 
@@ -71,6 +85,9 @@ export function TransactionManagement() {
   const [error, setError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] =
+    useState<TransactionPagination>(emptyPagination);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -80,7 +97,10 @@ export function TransactionManagement() {
   const [type, setType] = useState<TypeFilter>("all");
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedQuery(query), 350);
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(1);
+    }, 350);
     return () => window.clearTimeout(timeout);
   }, [query]);
 
@@ -93,12 +113,15 @@ export function TransactionManagement() {
 
       getTransactions({
         direction: direction === "all" ? undefined : direction,
+        limit: 10,
+        page,
         query: debouncedQuery,
         type: type === "all" ? undefined : type,
       })
         .then((result) => {
           if (ignoreResult) return;
           setTransactions(result.transactions);
+          setPagination(result.pagination);
           setSummary(result.summary);
         })
         .catch((requestError: Error) => {
@@ -113,7 +136,7 @@ export function TransactionManagement() {
       ignoreResult = true;
       window.clearTimeout(requestTimeout);
     };
-  }, [debouncedQuery, direction, reloadKey, type]);
+  }, [debouncedQuery, direction, page, reloadKey, type]);
 
   const visibleIds = transactions.map((transaction) => transaction.id);
   const allVisibleSelected =
@@ -141,8 +164,11 @@ export function TransactionManagement() {
 
     try {
       await deleteTransactions(pendingDeleteIds);
+      const deletedCurrentPage =
+        pendingDeleteIds.length >= transactions.length && page > 1;
       setPendingDeleteIds([]);
       setSelectedIds([]);
+      if (deletedCurrentPage) setPage((current) => current - 1);
       setReloadKey((current) => current + 1);
     } catch (requestError) {
       setError(
@@ -327,7 +353,10 @@ export function TransactionManagement() {
                 : "border-[var(--color-border)] bg-white hover:border-[var(--color-brand)]/40",
             )}
             key={item}
-            onClick={() => setDirection(item)}
+            onClick={() => {
+              setDirection(item);
+              setPage(1);
+            }}
             type="button"
           >
             <span className="text-[0.65rem] font-extrabold tracking-[0.12em] text-[var(--color-muted)] uppercase">
@@ -373,7 +402,10 @@ export function TransactionManagement() {
           </label>
           <CustomSelect
             ariaLabel="Filter by transaction type"
-            onChange={setType}
+            onChange={(value) => {
+              setType(value);
+              setPage(1);
+            }}
             options={typeOptions}
             value={type}
           />
@@ -412,11 +444,45 @@ export function TransactionManagement() {
         />
 
         {!isLoading && transactions.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
-            <span>
-              Showing {transactions.length} of {summary.all} transactions
-            </span>
-            <span>{selectedIds.length} selected</span>
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] px-5 py-4 text-[0.68rem] font-bold text-[var(--color-muted)]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span>
+                Showing {(pagination.page - 1) * pagination.limit + 1}–
+                {Math.min(
+                  pagination.page * pagination.limit,
+                  pagination.total,
+                )}{" "}
+                of {pagination.total} transactions
+              </span>
+              <span>{selectedIds.length} selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Previous transaction page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                type="button"
+              >
+                <CaretLeft size={15} weight="bold" />
+              </button>
+              <span className="min-w-20 text-center text-[0.7rem] text-[var(--color-ink-soft)]">
+                Page {pagination.page} of {pagination.pages}
+              </span>
+              <button
+                aria-label="Next transaction page"
+                className="grid size-9 place-items-center rounded-lg border border-[var(--color-border)] bg-white text-[var(--color-ink)] transition hover:border-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={pagination.page >= pagination.pages}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(pagination.pages, current + 1),
+                  )
+                }
+                type="button"
+              >
+                <CaretRight size={15} weight="bold" />
+              </button>
+            </div>
           </div>
         )}
       </section>
