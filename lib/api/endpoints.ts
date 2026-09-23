@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     paymentMethods: "/payment-methods",
     refresh: "/internal/token/refresh",
     transactions: "/transactions",
+    withdrawals: "/withdrawals",
   },
   frontend: {
     clients: "/api/admin/clients",
@@ -21,5 +22,6 @@ export const API_ENDPOINTS = {
     paymentMethods: "/api/admin/payment-methods",
     refresh: "/api/admin/token/refresh",
     transactions: "/api/admin/transactions",
+    withdrawals: "/api/admin/withdrawals",
   },
 } as const;

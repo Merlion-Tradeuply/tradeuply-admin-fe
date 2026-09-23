@@ -168,11 +168,32 @@ export type AdminDeposit = {
   methodCode: string;
   methodName: string;
   network: string;
-  paymentProofUrl: string | null;
   reviewNotes: string;
   reviewedAt: string | null;
   senderWalletAddress: string;
   status: "approved" | "pending" | "rejected";
   transactionHash: string;
+  updatedAt: string;
+};
+
+export type AdminWithdrawal = {
+  activities: AdminDepositActivity[];
+  amount: string;
+  asset: string;
+  client?: {
+    email: string;
+    firstName: string;
+    id: string;
+    lastName: string;
+  };
+  createdAt: string;
+  destinationLabel: string;
+  destinationNetwork: string;
+  destinationWalletAddress: string;
+  id: string;
+  paymentMethodId: string;
+  reviewNotes: string;
+  reviewedAt: string | null;
+  status: "approved" | "pending" | "rejected";
   updatedAt: string;
 };

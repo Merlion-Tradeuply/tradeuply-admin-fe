@@ -1,5 +1,6 @@
 import {
   Coins,
+  ArrowUp,
   CreditCard,
   Briefcase,
   Receipt,
@@ -17,6 +18,11 @@ export const adminNavigation = [
     href: "/deposits",
     icon: Coins,
     label: "Deposits",
+  },
+  {
+    href: "/withdrawals",
+    icon: ArrowUp,
+    label: "Withdrawals",
   },
   {
     href: "/clients",

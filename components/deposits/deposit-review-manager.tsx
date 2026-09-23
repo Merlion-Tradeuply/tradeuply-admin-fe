@@ -10,7 +10,6 @@ import {
   SpinnerGap,
   X,
 } from "@phosphor-icons/react";
-import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -417,30 +416,7 @@ export function DepositReviewManager() {
               {selected.client?.firstName} {selected.client?.lastName} ·{" "}
               {selected.client?.email}
             </p>
-            <div className="mt-7 grid gap-5 sm:grid-cols-[15rem_1fr]">
-              {selected.paymentProofUrl ? (
-                <a
-                  className="group relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[#f5f8f7]"
-                  href={selected.paymentProofUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <Image
-                    alt="Client payment screenshot"
-                    className="object-contain p-2 transition group-hover:scale-[1.02]"
-                    fill
-                    sizes="240px"
-                    src={selected.paymentProofUrl}
-                  />
-                  <span className="absolute right-3 bottom-3 rounded-lg bg-[var(--color-ink)] px-3 py-2 text-[0.62rem] font-extrabold text-white shadow-lg">
-                    Open full image
-                  </span>
-                </a>
-              ) : (
-                <div className="grid aspect-[4/3] place-items-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[#f5f8f7] px-5 text-center text-xs font-bold text-[var(--color-muted)]">
-                  No payment screenshot was stored for this earlier deposit.
-                </div>
-              )}
+            <div className="mt-7">
               <dl className="grid gap-4 rounded-2xl bg-[#f5f8f7] p-5 sm:grid-cols-2">
                 <div>
                   <dt className="text-[0.62rem] font-extrabold tracking-[0.1em] text-[var(--color-muted)] uppercase">
