@@ -1,5 +1,9 @@
 import { API_ENDPOINTS } from "@/lib/api/endpoints";
-import type { AdminClient, AdminClientDetails } from "@/lib/api/types";
+import type {
+  AdminClient,
+  AdminClientDetails,
+  AdminClientInvestment,
+} from "@/lib/api/types";
 
 export type ClientUpdatePayload = {
   experience: AdminClient["investmentProfile"]["experience"];
@@ -70,6 +74,22 @@ export async function getClients(filters: ClientFilters = {}) {
 export async function getClientDetails(clientId: string) {
   const response = await fetch(`${API_ENDPOINTS.frontend.clients}/${clientId}`);
   return readResponse<AdminClientDetails>(response);
+}
+
+export async function creditClientInvestmentBonus(
+  clientId: string,
+  investmentId: string,
+  payload: { amountUsd: number; note?: string },
+) {
+  const response = await fetch(
+    `${API_ENDPOINTS.frontend.clients}/${clientId}/investments/${investmentId}/bonus`,
+    {
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+  );
+  return readResponse<{ investment: AdminClientInvestment }>(response);
 }
 
 export async function updateClient(

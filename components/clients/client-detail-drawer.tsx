@@ -15,6 +15,7 @@ import type { AdminClient, AdminClientDetails } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import {
   deleteClients,
+  creditClientInvestmentBonus,
   getClientDetails,
   updateClient,
   type ClientUpdatePayload,
@@ -47,6 +48,10 @@ export function ClientDetailDrawer({
   onUpdated: (client: AdminClient) => void;
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const [bonusAmounts, setBonusAmounts] = useState<Record<string, string>>({});
+  const [bonusNotes, setBonusNotes] = useState<Record<string, string>>({});
+  const [bonusMessage, setBonusMessage] = useState("");
+  const [creditingInvestmentId, setCreditingInvestmentId] = useState("");
   const [details, setDetails] = useState<AdminClientDetails | null>(null);
   const [editForm, setEditForm] = useState<ClientUpdatePayload | null>(null);
   const [error, setError] = useState("");
@@ -122,6 +127,48 @@ export function ClientDetailDrawer({
       );
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function addBonus(investmentId: string) {
+    if (!details) return;
+    const amountUsd = Number(bonusAmounts[investmentId]);
+    if (!Number.isFinite(amountUsd) || amountUsd < 0.01) {
+      setError("Enter a bonus amount of at least $0.01.");
+      return;
+    }
+
+    setCreditingInvestmentId(investmentId);
+    setBonusMessage("");
+    setError("");
+    try {
+      const result = await creditClientInvestmentBonus(
+        details.client.id,
+        investmentId,
+        {
+          amountUsd,
+          note: bonusNotes[investmentId]?.trim() || undefined,
+        },
+      );
+      setDetails((current) => current
+        ? {
+            ...current,
+            investments: current.investments.map((investment) =>
+              investment.id === investmentId ? result.investment : investment,
+            ),
+          }
+        : current);
+      setBonusAmounts((current) => ({ ...current, [investmentId]: "" }));
+      setBonusNotes((current) => ({ ...current, [investmentId]: "" }));
+      setBonusMessage("Bonus credited successfully and is now available to the client.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The investment bonus could not be credited.",
+      );
+    } finally {
+      setCreditingInvestmentId("");
     }
   }
 
@@ -527,6 +574,11 @@ export function ClientDetailDrawer({
                     Every investment created by this client and its current lifecycle.
                   </p>
                 </div>
+                {bonusMessage && (
+                  <p className="mx-5 mt-5 rounded-xl bg-[#e5f8ee] p-3 text-xs font-bold text-[#008c4e]">
+                    {bonusMessage}
+                  </p>
+                )}
                 {details.investments.length === 0 ? (
                   <p className="p-6 text-sm font-medium text-[var(--color-muted)]">
                     No investments created yet.
@@ -617,6 +669,69 @@ export function ClientDetailDrawer({
                           <p className="mt-4 rounded-xl bg-[#e8f0ff] p-3 text-[0.68rem] font-bold text-[#315ea8]">
                             Capital returned on {new Date(investment.capitalReturnedAt).toLocaleString()}.
                           </p>
+                        )}
+                        {investment.status !== "cancelled" && (
+                          <div className="mt-4 rounded-xl border border-[var(--color-brand)]/20 bg-white p-4">
+                            <p className="text-[0.62rem] font-extrabold tracking-[0.09em] text-[var(--color-brand-hover)] uppercase">
+                              Credit bonus profit
+                            </p>
+                            <p className="mt-1 text-[0.67rem] leading-5 font-medium text-[var(--color-muted)]">
+                              Added immediately to available profit without changing the daily schedule.
+                            </p>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-[0.7fr_1.3fr]">
+                              <label className="text-[0.68rem] font-extrabold text-[var(--color-ink)]">
+                                Bonus amount (USD)
+                                <input
+                                  className="mt-2 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-3 text-sm font-bold outline-none focus:border-[var(--color-brand)]"
+                                  min="0.01"
+                                  onChange={(event) => {
+                                    setBonusAmounts((current) => ({
+                                      ...current,
+                                      [investment.id]: event.target.value,
+                                    }));
+                                    setError("");
+                                    setBonusMessage("");
+                                  }}
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  type="number"
+                                  value={bonusAmounts[investment.id] ?? ""}
+                                />
+                              </label>
+                              <label className="text-[0.68rem] font-extrabold text-[var(--color-ink)]">
+                                Note (optional)
+                                <input
+                                  className="mt-2 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[#f8faf9] px-3 text-sm font-bold outline-none focus:border-[var(--color-brand)]"
+                                  maxLength={300}
+                                  onChange={(event) => {
+                                    setBonusNotes((current) => ({
+                                      ...current,
+                                      [investment.id]: event.target.value,
+                                    }));
+                                    setError("");
+                                    setBonusMessage("");
+                                  }}
+                                  placeholder="Reason for this bonus"
+                                  value={bonusNotes[investment.id] ?? ""}
+                                />
+                              </label>
+                            </div>
+                            <button
+                              className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand)] px-4 text-xs font-extrabold text-white disabled:cursor-wait disabled:opacity-65"
+                              disabled={creditingInvestmentId === investment.id}
+                              onClick={() => void addBonus(investment.id)}
+                              type="button"
+                            >
+                              {creditingInvestmentId === investment.id ? (
+                                <SpinnerGap className="animate-spin" size={16} />
+                              ) : (
+                                <CurrencyCircleDollar size={17} weight="duotone" />
+                              )}
+                              {creditingInvestmentId === investment.id
+                                ? "Crediting bonus…"
+                                : "Add Bonus to Profit"}
+                            </button>
+                          </div>
                         )}
                       </article>
                     ))}
